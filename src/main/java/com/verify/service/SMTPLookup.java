@@ -1,7 +1,11 @@
 package com.verify.service;
 
+import com.verify.model.EmailValidation;
 import lombok.SneakyThrows;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
@@ -16,6 +20,8 @@ import java.util.*;
 //used https://www.rgagnon.com/javadetails/java-0452.html implementation
 @Service
 public class SMTPLookup {
+    private static final Logger logger = LogManager.getLogger(SMTPLookup.class);
+
     private static int hear(BufferedReader in) throws IOException {
         String line;
         int res = 0;
@@ -104,7 +110,6 @@ public class SMTPLookup {
         // the actual mail server] to reject it. This is why we REALLY ought
         // to take the preference into account.
         for (String mx : mxSet) {
-            try {
                 int res;
                 //
                 Socket skt = new Socket(mx, 25);
@@ -114,16 +119,25 @@ public class SMTPLookup {
                         (new OutputStreamWriter(skt.getOutputStream()));
 
                 res = hear(rdr);
-                if (res != 220) throw new Exception("Invalid header");
+                if (res != 220) {
+                    logger.info("Address " + address + " is not valid!");
+                    return false;
+                }
                 say(wtr, "EHLO rgagnon.com");
 
                 res = hear(rdr);
-                if (res != 250) throw new Exception("Not ESMTP");
+                if (res != 250){
+                    logger.info("Address " + address + " is not valid!");
+                    return false;
+                }
 
                 // validate the sender address
                 say(wtr, "MAIL FROM: <mat@yahoo.com>");
                 res = hear(rdr);
-                if (res != 250) throw new Exception("Sender rejected");
+                if (res != 250) {
+                    logger.info("Address " + address + " is not valid!");
+                    return false;
+                }
 
                 say(wtr, "RCPT TO: <" + address + ">");
                 res = hear(rdr);
@@ -133,16 +147,15 @@ public class SMTPLookup {
                 hear(rdr);
                 say(wtr, "QUIT");
                 hear(rdr);
-                if (res != 250)
-                    throw new Exception("Address is not valid!");
+                if (res != 250) {
+                    logger.info("Address " + address + " is not valid!");
+                    return false;
+                }
 
                 rdr.close();
                 wtr.close();
                 skt.close();
                 return true;
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
         }
 
         return false;
@@ -151,20 +164,24 @@ public class SMTPLookup {
     public String[] checkAll(String name, String surname, String domain) {
 
         String[] testData = generateEmailsAddress(name, surname, domain);
+        List<String> forApi = Arrays.asList(testData.clone());
 
         List<String> result = new ArrayList<>();
         int count = 0;
 
-        for (String data :
-                testData) {
+        for (String data : testData) {
             if (isAddressValid(data)) {
-                result.add(data + " działa");
+                result.add(data + " working");
+            } else {
+                result.add("! " + data + " not working !");
                 count++;
-            } else
-                result.add("!" + data + " nie działa!");
+            }
         }
-        if (count > 9) {
-            return new String[]{"Catch-all"};
+
+        if (count == result.size()) {
+            return checkFromAPI(forApi);
+        } else if (count == 0) {
+            return checkFromAPI(forApi);
         } else
             return result.toArray(new String[0]);
     }
@@ -187,5 +204,32 @@ public class SMTPLookup {
         result.add(String.format("biuro@%s", domain));
 
         return result.toArray(new String[0]);
+    }
+
+    private String[] checkFromAPI(List<String> address) {
+        logger.info(new Date().toString() + "     " + "Getting data from API for: " + address);
+        System.out.println("GETTING DATA FROM API");
+        RestTemplate restTemplate = new RestTemplate();
+        EmailValidation response = restTemplate.getForObject("https://emailvalidation.abstractapi.com/v1/?api_key=a8a6ff502bd24bdd936dc4c9af4a30d8&email=" + address.get(0), EmailValidation.class);
+
+        if (response == null) {
+            throw new IllegalArgumentException();
+        }
+
+        logger.info("DELIVERABILITY: " + response.getDeliverability());
+        logger.info("CATCH-ALL: " + response.getDeliverability());
+        logger.info("address: " + "https://emailvalidation.abstractapi.com/v1/?api_key=a8a6ff502bd24bdd936dc4c9af4a30d8&email=" + address.get(0));
+
+        if (response.getDeliverability().equals("DELIVERABLE") && !response.getIsCatchallEmail().getText().equals("TRUE"))
+            return new String[]{address.get(0) + " DELIVERABLE"};
+        else if (response.getIsCatchallEmail().getText().equals("TRUE"))
+            return new String[]{"CATCH-ALL"};
+        else {
+            for (int i = 0; i < address.size(); i++) {
+                address.set(i, "! " + address.get(i) + " nie działa!");
+            }
+        }
+
+        return address.toArray(new String[0]);
     }
 } 
