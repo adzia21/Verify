@@ -14,7 +14,7 @@ import com.verify.service.SMTPLookup;
 import java.util.ArrayList;
 import java.util.List;
 
-@Route("mail")
+@Route("mail-old")
 public class CheckMailGUI extends VerticalLayout  {
     SMTPLookup smtpLookup = new SMTPLookup();
 
