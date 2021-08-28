@@ -1,6 +1,6 @@
 package com.verify.service;
 
-import com.verify.model.EmailValidation;
+import com.verify.model.EmailValidationResponse;
 import lombok.SneakyThrows;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -210,7 +210,7 @@ public class SMTPLookup {
         logger.info(new Date().toString() + "     " + "Getting data from API for: " + address);
         System.out.println("GETTING DATA FROM API");
         RestTemplate restTemplate = new RestTemplate();
-        EmailValidation response = restTemplate.getForObject("https://emailvalidation.abstractapi.com/v1/?api_key=a8a6ff502bd24bdd936dc4c9af4a30d8&email=" + address.get(0), EmailValidation.class);
+        EmailValidationResponse response = restTemplate.getForObject("https://emailvalidation.abstractapi.com/v1/?api_key=a8a6ff502bd24bdd936dc4c9af4a30d8&email=" + address.get(0), EmailValidationResponse.class);
 
         if (response == null) {
             throw new IllegalArgumentException();

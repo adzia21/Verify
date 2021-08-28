@@ -1,6 +1,6 @@
 package com.verify.service;
 
-import com.verify.model.EmailValidation;
+import com.verify.model.VerimailResponse;
 import lombok.SneakyThrows;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -20,6 +20,7 @@ import java.util.List;
 @Service
 public class SMTPLookupMultiThread {
     private static final Logger logger = LogManager.getLogger(SMTPLookup.class);
+    private static final String APIKey = "6E62E343F7A44CEBAA7B7774331F9907";
 
     private static int hear(BufferedReader in) throws IOException {
         String line;
@@ -144,9 +145,9 @@ public class SMTPLookupMultiThread {
         }
 
         if (count == result.size())
-            return checkFromAPI(forApi);
+            return checkMostCommonFromAPI(forApi);
         else if (count == 0)
-            return checkFromAPI(forApi);
+            return checkMostCommonFromAPI(forApi);
         else
             return result.toArray(new String[0]);
     }
@@ -173,9 +174,9 @@ public class SMTPLookupMultiThread {
         }
 
         if (count == result.size())
-            return checkFromAPI(forApi);
+            return checkMostCommonFromAPI(forApi);
         else if (count == 0)
-            return checkFromAPI(forApi);
+            return checkMostCommonFromAPI(forApi);
         else
             return result.toArray(new String[0]);
     }
@@ -219,30 +220,40 @@ public class SMTPLookupMultiThread {
     }
 
 
-    private String[] checkFromAPI(List<String> address) {
-        logger.info(new Date().toString() + "     " + "Getting data from API for: " + address);
-        System.out.println("GETTING DATA FROM API");
+    private String[] checkMostCommonFromAPI(List<String> address) {
+        logger.info(new Date().toString() + "     " + "Checking only the most common mails)");
+        logger.info(new Date().toString() + "     " + "Getting data for: " + address);
         RestTemplate restTemplate = new RestTemplate();
-        EmailValidation response = restTemplate.getForObject("https://emailvalidation.abstractapi.com/v1/?api_key=a8a6ff502bd24bdd936dc4c9af4a30d8&email=" + address.get(0), EmailValidation.class);
 
-        if (response == null) {
-            throw new IllegalArgumentException();
+        List<String> addressForAPI = new ArrayList<>();
+        addressForAPI.add(address.get(0));
+        if (address.size() > 10) {
+            addressForAPI.add(address.get(8));
+            addressForAPI.add(address.get(7));
         }
+        VerimailResponse response1 = restTemplate.getForObject("https://api.verimail.io/v3/verify?email=" + addressForAPI.get(0) + "&key=" + APIKey, VerimailResponse.class);
 
-        logger.info("DELIVERABILITY: " + response.getDeliverability());
-        logger.info("CATCH-ALL: " + response.getDeliverability());
-        logger.info("address: " + "https://emailvalidation.abstractapi.com/v1/?api_key=a8a6ff502bd24bdd936dc4c9af4a30d8&email=" + address.get(0));
+        assert response1 != null;
+        if (response1.getResult().equals("catch_all"))
+            return new String[]{"Catch_all"};
+        else if (response1.getResult().equals("deliverable"))
+            return new String[]{response1.getEmail() + " deliverable"};
 
-        if (response.getDeliverability().equals("DELIVERABLE") && !response.getIsCatchallEmail().getText().equals("TRUE"))
-            return new String[]{address.get(0) + " DELIVERABLE"};
-        else if (response.getIsCatchallEmail().getText().equals("TRUE"))
-            return new String[]{"CATCH-ALL"};
         else {
-            for (int i = 0; i < address.size(); i++) {
-                address.set(i, "! " + address.get(i) + " nie działa!");
+            VerimailResponse response2 = restTemplate.getForObject("https://api.verimail.io/v3/verify?email=" + addressForAPI.get(1) + "&key=" + APIKey, VerimailResponse.class);
+            assert response2 != null;
+            if (response2.getResult().equals("deliverable"))
+                return new String[]{response2.getEmail() + " deliverable"};
+            else {
+                VerimailResponse response3 = restTemplate.getForObject("https://api.verimail.io/v3/verify?email=" + addressForAPI.get(2) + "&key=" + APIKey, VerimailResponse.class);
+                assert response3 != null;
+                if (response3.getResult().equals("deliverable"))
+                    return new String[]{response3.getEmail() + " deliverable"};
             }
         }
-
+        for (int i = 0; i < address.size(); i++) {
+            address.set(i, "!" + address.get(i) + " nie działa!");
+        }
         return address.toArray(new String[0]);
     }
 }
