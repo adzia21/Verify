@@ -219,6 +219,19 @@ public class SMTPLookupMultiThread {
         return result.toArray(new String[0]);
     }
 
+    public static String checkFromApi(String address) {
+        logger.info(new Date().toString() + "     " + "Pobieranie danych z API dla: " + address);
+        RestTemplate restTemplate = new RestTemplate();
+
+        VerimailResponse response = restTemplate.getForObject("https://api.verimail.io/v3/verify?email=" + address + "&key=" + APIKey, VerimailResponse.class);
+
+        if (response.getResult().equals("catch_all"))
+            return "Catch_all";
+        else if (response.getResult().equals("deliverable"))
+            return response.getEmail() + " deliverable";
+        else
+            return "!" + address + " nie działa";
+    }
 
     private String[] checkMostCommonFromAPI(List<String> address) {
         logger.info(new Date().toString() + "     " + "Checking only the most common mails)");
