@@ -63,7 +63,7 @@ public class CheckSiteGUI extends VerticalLayout {
 
             checkMails.addClickListener(event2 -> {
                 result.parallelStream().forEach(data -> {
-                    if (isAddressValid(data)) {
+                    if (checkFromApi(data).charAt(0) == '!') {
                         resultMails.add(data + " is working");
                         resultSelected.add(data + " is working");
                     } else {
